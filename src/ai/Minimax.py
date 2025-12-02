@@ -51,5 +51,14 @@ def minimax(board: Board, depth: int, maximizing: bool, ai_color: int,
 
 
 def choose_ai_move(board: Board, ai_color: int):
+    # Nếu bàn cờ đã gần đầy (>70 quân) và heuristic của trạng thái hiện tại rất tốt → pass
+    total_stones = sum(1 for i in range(9) for j in range(9) if board.grid[i][j] != 0)
+    if total_stones > 65:  # khoảng 80% bàn cờ
+        current_score = heuristic(board, ai_color)
+        # Nếu đang dẫn trước nhiều → pass luôn
+        if (ai_color == BLACK and current_score > 30) or \
+           (ai_color == WHITE and current_score > 20):
+            return None  # pass
+
     _, move = minimax(board, MAX_DEPTH, True, ai_color)
     return move

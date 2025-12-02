@@ -1,54 +1,42 @@
-# ai/heuristic.py
+# ai/Heuristic.py
 
 from models.Board import Board
-from models.GameState import BOARD_SIZE, BLACK, WHITE
+from models.GameState import BLACK, WHITE
 
 
 def heuristic(board: Board, ai_color: int) -> float:
     """
-    H(state) = w1 * (số quân AI - số quân đối thủ)
-             + w2 * (tổng số khí của nhóm AI - nhóm đối thủ)
-             + w3 * (ưu tiên quân gần trung tâm)
+    Heuristic mạnh cho Go 9x9 - đủ để AI chơi khá thông minh
     """
+    # Nếu đã game over (tương lai sẽ xử lý), trả giá trị cực đại
+    # if board.is_game_over(): ...
 
-    size = board.size
-    center = (size - 1) / 2.0
+    # 1. Số quân
+    ai_stones = board.count_stones(ai_color)
+    opp_stones = board.count_stones(-ai_color)
 
-    ai_stones = 0
-    opp_stones = 0
-    ai_libs = 0
-    opp_libs = 0
-    center_score = 0.0
+    # 2. Tổng số khí
+    ai_libs = board.count_total_liberties(ai_color)
+    opp_libs = board.count_total_liberties(-ai_color)
 
-    seen_groups = set()
+    # 3. Số nhóm đang bị đe dọa (có <=2 liberties)
+    ai_threatened = board.count_threatened_groups(ai_color)
+    opp_threatened = board.count_threatened_groups(-ai_color)
 
-    for i in range(size):
-        for j in range(size):
-            v = board.grid[i][j]
-            if v == 0:
-                continue
-            if (i, j) in seen_groups:
-                continue
+    # 4. Ước lượng lãnh thổ (rất quan trọng cuối game)
+    ai_territory, opp_territory = board.estimate_territory()
 
-            group, libs = board.get_group_and_liberties(i, j)
-            seen_groups |= group
+    # Trọng số (đã tinh chỉnh để AI chơi hợp lý)
+    w_stone = 10.0
+    w_lib = 1.3
+    w_threat = 18.0        # cứu quân mình / ăn quân địch là ưu tiên cao
+    w_territory = 11.0
 
-            if v == ai_color:
-                ai_stones += len(group)
-                ai_libs += len(libs)
-            else:
-                opp_stones += len(group)
-                opp_libs += len(libs)
+    score = (
+        w_stone * (ai_stones - opp_stones) +
+        w_lib * (ai_libs - opp_libs) +
+        w_threat * (opp_threatened - ai_threatened) +   # ưu tiên ăn quân địch hơn cứu mình
+        w_territory * (ai_territory - opp_territory)
+    )
 
-    # điểm vị trí gần trung tâm
-    for i in range(size):
-        for j in range(size):
-            v = board.grid[i][j]
-            if v == ai_color:
-                dist = abs(i - center) + abs(j - center)
-                center_score += (size - dist)
-
-    w1, w2, w3 = 10.0, 1.0, 0.5
-    diff_stone = ai_stones - opp_stones
-    diff_lib = ai_libs - opp_libs
-    return w1 * diff_stone + w2 * diff_lib + w3 * center_score
+    return score

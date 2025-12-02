@@ -1,6 +1,7 @@
 # models/Board.py
 
 from collections import deque
+from typing import Set, Tuple, List
 from .GameState import BOARD_SIZE, EMPTY, BLACK, WHITE
 
 
@@ -25,29 +26,27 @@ class Board:
         return new_b
 
     # ---------- nhóm quân + khí ----------
-    def get_group_and_liberties(self, x: int, y: int):
-        """Trả về (set group, set liberties) của quân tại (x,y)."""
+    def get_group_and_liberties(self, x: int, y: int) -> Tuple[Set[Tuple[int, int]], Set[Tuple[int, int]]]:
         color = self.grid[x][y]
         if color == EMPTY:
             return set(), set()
 
         visited = set()
         liberties = set()
-        q = deque([(x, y)])
+        queue = deque([(x, y)])
         visited.add((x, y))
 
-        while q:
-            cx, cy = q.popleft()
+        while queue:
+            cx, cy = queue.popleft()
             for nx, ny in self.neighbors(cx, cy):
-                v = self.grid[nx][ny]
-                if v == EMPTY:
+                if self.grid[nx][ny] == EMPTY:
                     liberties.add((nx, ny))
-                elif v == color and (nx, ny) not in visited:
+                elif self.grid[nx][ny] == color and (nx, ny) not in visited:
                     visited.add((nx, ny))
-                    q.append((nx, ny))
+                    queue.append((nx, ny))
         return visited, liberties
 
-    def remove_group(self, group):
+    def remove_group(self, group: Set[Tuple[int, int]]):
         for x, y in group:
             self.grid[x][y] = EMPTY
 
@@ -56,62 +55,133 @@ class Board:
         return self.grid[x][y] == EMPTY
 
     def apply_move(self, x: int, y: int, color: int) -> bool:
-        """
-        Đặt quân (nếu ô trống) + bắt quân đối thủ nếu hết khí.
-        Có kiểm tra luật tự sát: nếu sau khi đi, nhóm quân vừa đặt
-        không còn khí thì nước đi không hợp lệ.
-        Trả về True nếu nước đi hợp lệ.
-        """
         if not self.in_bounds(x, y) or not self.is_empty(x, y):
             return False
 
-        # đặt quân tạm
+        # Đặt quân tạm
         self.grid[x][y] = color
-        opponent = BLACK if color == WHITE else WHITE
+        opponent = -color  # BLACK = -1, WHITE = 1 → -color là đối thủ
 
-        # kiểm tra các nhóm đối thủ xung quanh: nếu hết khí thì bị bắt
-        to_remove = []
+        captured_groups = []
+
+        # Kiểm tra các nhóm đối thủ xung quanh
         for nx, ny in self.neighbors(x, y):
             if self.grid[nx][ny] == opponent:
                 group, libs = self.get_group_and_liberties(nx, ny)
-                if len(libs) == 0:
-                    to_remove.extend(group)
+                if len(libs) == 0 and group not in captured_groups:
+                    captured_groups.append(group)
 
-        # xóa các nhóm bị bắt (nếu có)
-        for gx, gy in to_remove:
-            self.grid[gx][gy] = EMPTY
+        # Bắt quân đối thủ
+        for group in captured_groups:
+            self.remove_group(group)
 
-        # sau khi bắt xong, kiểm tra nhóm của chính quân vừa đặt
-        group, libs = self.get_group_and_liberties(x, y)
-        if len(libs) == 0:
-            # nước tự sát → phải undo: bỏ quân vừa đặt và restore đối thủ
+        # Kiểm tra tự sát
+        my_group, my_libs = self.get_group_and_liberties(x, y)
+        if len(my_libs) == 0 and not captured_groups:  # chỉ tự sát nếu không bắt được quân nào
+            # Undo: bỏ quân vừa đặt và phục hồi nhóm bị bắt (nếu có)
             self.grid[x][y] = EMPTY
-            for gx, gy in to_remove:
-                self.grid[gx][gy] = opponent
+            for group in captured_groups:
+                for gx, gy in group:
+                    self.grid[gx][gy] = opponent
             return False
 
         return True
 
-
-    def legal_moves(self, color: int):
-        """Ở đây đơn giản: mọi ô trống đều là nước đi hợp lệ."""
+    # ---------- danh sách nước hợp lệ ----------
+    def legal_moves(self, color: int) -> List[Tuple[int, int]]:
         moves = []
         for i in range(self.size):
             for j in range(self.size):
                 if self.grid[i][j] == EMPTY:
-                    moves.append((i, j))
+                    # Tạo bản sao tạm để thử đặt
+                    temp = self.copy()
+                    if temp.apply_move(i, j, color):
+                        moves.append((i, j))
         return moves
-    
-    
-    def count_stones(self):
-        """Đếm số quân đen và trắng hiện có trên bàn."""
-        black = 0
-        white = 0
-        for row in self.grid:
-            for v in row:
-                if v == BLACK:
+
+    # ---------- đếm quân ----------
+    def count_stones(self, color: int = None) -> int | Tuple[int, int]:
+        black = white = 0
+        for i in range(self.size):
+            for j in range(self.size):
+                if self.grid[i][j] == BLACK:
                     black += 1
-                elif v == WHITE:
+                elif self.grid[i][j] == WHITE:
                     white += 1
+        if color == BLACK:
+            return black
+        if color == WHITE:
+            return white
         return black, white
 
+    # ---------- tổng số khí ----------
+    def count_total_liberties(self, color: int) -> int:
+        total = 0
+        seen = set()
+        for i in range(self.size):
+            for j in range(self.size):
+                if self.grid[i][j] == color and (i, j) not in seen:
+                    group, liberties = self.get_group_and_liberties(i, j)
+                    seen.update(group)
+                    total += len(liberties)
+        return total
+
+    # ---------- ước lượng lãnh thổ ----------
+    def estimate_territory(self) -> Tuple[int, int]:
+        visited = [[False] * self.size for _ in range(self.size)]
+        black_terr = white_terr = 0
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+        def flood_fill(r: int, c: int) -> Tuple[set, int]:
+            if visited[r][c] or self.grid[r][c] != EMPTY:
+                return set(), 0
+            queue = [(r, c)]
+            visited[r][c] = True
+            area = 0
+            borders = set()
+
+            while queue:
+                x, y = queue.pop(0)
+                area += 1
+                for dx, dy in directions:
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < self.size and 0 <= ny < self.size:
+                        cell = self.grid[nx][ny]
+                        if cell != EMPTY:
+                            borders.add(cell)
+                        elif not visited[nx][ny]:
+                            visited[nx][ny] = True
+                            queue.append((nx, ny))
+            return borders, area
+
+        for i in range(self.size):
+            for j in range(self.size):
+                if not visited[i][j] and self.grid[i][j] == EMPTY:
+                    borders, size = flood_fill(i, j)
+                    if len(borders) == 1:
+                        owner = next(iter(borders))
+                        if owner == BLACK:
+                            black_terr += size
+                        elif owner == WHITE:
+                            white_terr += size
+        return black_terr, white_terr
+    
+    def count_threatened_groups(self, color: int) -> int:
+        """
+        Đếm số nhóm của color có <= 2 liberties (dễ bị ăn = atari hoặc gần chết)
+        Rất quan trọng để AI biết cứu quân hoặc tấn công!
+        """
+        threatened = 0
+        seen = set()
+        for i in range(self.size):
+            for j in range(self.size):
+                if self.grid[i][j] == color and (i, j) not in seen:
+                    group, liberties = self.get_group_and_liberties(i, j)
+                    seen.update(group)
+                    if len(liberties) <= 2:  # <= 2 là nguy hiểm
+                        threatened += 1
+        return threatened
+
+    # ---------- tạm thời để heuristic không crash ----------
+    def is_game_over(self) -> bool:
+        return False  # Sẽ xử lý sau khi thêm pass liên tiếp trong GameState

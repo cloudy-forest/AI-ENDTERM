@@ -12,6 +12,8 @@ class GameController:
     def __init__(self, mode: str = "HUMAN_VS_AI"):
         self.mode = mode  # "HUMAN_VS_AI" hoặc "HUMAN_VS_HUMAN"
 
+        self.end_reason = ""
+        
         # khởi tạo game lần đầu
         self.setup_new_game()
 
@@ -75,13 +77,15 @@ class GameController:
             return
 
         if action == "pass":
-            self.state.switch_player()
+            self.state.pass_move()
+            self.check_game_over()
             return
 
         if action == "resign":
             self.game_over = True
+            self.end_reason = "resign"
             winner = "White" if self.state.current_player == BLACK else "Black"
-            self.result_text = f"{winner} wins by resignation"
+            self.result_text = f"{winner} wins by resignation !"
             return
 
     def handle_click(self, pos):
@@ -127,18 +131,51 @@ class GameController:
                     self.captured_white += captured
 
             self.prev_black_stones, self.prev_white_stones = b, w
+            
+            # Đặt quân -> reset pass counter
+            self.state.place_stone()
             self.state.switch_player()
+            self.check_game_over()
+            
+    def check_game_over(self):
+        if self.state.is_game_over():
+            self.game_over = True
+            self.end_reason = "pass"
+            black_score, white_score = self.calculate_final_score()
+            if black_score > white_score:
+                self.result_text = f"Black wins {black_score:.1f} - {white_score:.1f}"
+            elif white_score > black_score:
+                self.result_text = f"White wins {white_score:.1f} - {black_score:.1f}"
+            else:
+                self.result_text = f"Draw {black_score:.1f} - {black_score:.1f}"
 
+    # ----------------- tính điểm cuối game (Luật Trung Quốc) -----------------
+    def calculate_final_score(self):
+        black_stones, white_stones = self.board.count_stones()
+        black_terr, white_terr = self.board.estimate_territory()
+
+        # Chinese rule: điểm = quân trên bàn + lãnh thổ
+        # (không cộng komi ở đây, bạn có thể +7.5 cho trắng nếu muốn)
+        black_score = black_stones + black_terr
+        white_score = white_stones + white_terr + 7.5  # komi 7.5 cho trắng
+
+        return black_score, white_score
+    
     # ----------------- update mỗi frame -----------------
-
+    
     def update(self):
         if self.game_over:
             return
         if self.is_current_ai():
             player = self.current_player_obj()
             move = player.choose_move(self.state)
-            if move:
+            if move is None:
+                # AI chọn pass
+                self.state.pass_move()  # AI cũng phải gọi pass_move()
+            else:
                 self.apply_move_and_update(move)
+            
+            self.check_game_over()
 
     # ----------------- vẽ -----------------
 
