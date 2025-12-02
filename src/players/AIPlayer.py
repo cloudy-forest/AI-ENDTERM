@@ -10,5 +10,4 @@ class AIPlayer(Player):
     def choose_move(
         self, state: GameState, click_pos: Optional[Tuple[int, int]] = None
     ):
-        # click_pos không dùng
         return choose_ai_move(state.board, self.color)

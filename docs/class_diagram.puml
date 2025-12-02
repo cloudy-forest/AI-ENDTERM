@@ -1,0 +1,120 @@
+@startuml
+title Go 9x9 Adversarial Search – Class Diagram
+
+skinparam classAttributeIconSize 0
+
+' =======================
+' Core model
+' =======================
+
+class Board {
+    - size: int
+    - grid: int[][]
+    + in_bounds(x: int, y: int): bool
+    + neighbors(x: int, y: int): iterable
+    + copy(): Board
+    + get_group_and_liberties(x: int, y: int): (set, set)
+    + remove_group(group: set)
+    + apply_move(x: int, y: int, color: int): bool
+    + legal_moves(color: int): list
+    + count_stones(): (int, int)
+}
+
+class GameState {
+    + board: Board
+    + current_player: int
+    + switch_player()
+}
+
+' =======================
+' Players
+' =======================
+
+abstract class Player {
+    + color: int
+    + name: str
+    + choose_move(state: GameState, click_pos)
+}
+
+class HumanPlayer extends Player
+class AIPlayer extends Player
+
+' =======================
+' AI utilities
+' =======================
+
+class Minimax <<utility>> {
+    + minimax(board: Board, depth: int, maximizing: bool, ai_color: int, alpha, beta): (float, (int,int))
+    + choose_ai_move(board: Board, ai_color: int): (int,int)
+}
+
+class Heuristic <<utility>> {
+    + heuristic(board: Board, ai_color: int): float
+}
+
+AIPlayer ..> Minimax
+AIPlayer ..> Heuristic
+
+' =======================
+' Controller & UI
+' =======================
+
+class GameController {
+    + mode: str
+    + board: Board
+    + state: GameState
+    + black_player: Player
+    + white_player: Player
+    + ui: GameUI
+    + setup_new_game()
+    + current_player_obj(): Player
+    + is_current_ai(): bool
+    + handle_click(pos)
+    + apply_move_and_update(move)
+    + update()
+    + draw(screen)
+    + get_window_size(): (int,int)
+}
+
+class GameUI {
+    + controller: GameController
+    + btn_newgame: Button
+    + btn_pass: Button
+    + btn_resign: Button
+    + btn_mode_hvh: Button
+    + btn_mode_hvai: Button
+    + get_window_size(): (int,int)
+    + pixel_to_board(pos): (int,int)
+    + hit_test_buttons(pos): str
+    + draw_board(screen, mouse_pos)
+    + draw_panel(screen, mouse_pos)
+    + draw(screen)
+}
+
+class Button {
+    + rect
+    + text: str
+    + font
+    + base_color
+    + hover_color
+    + text_color
+    + border_color
+    + border_radius: int
+    + draw(screen, mouse_pos)
+    + hit_test(pos): bool
+}
+
+' =======================
+' Relationships
+' =======================
+
+GameController o-- GameState
+GameState o-- Board
+
+GameController o-- Player : black_player
+GameController o-- Player : white_player
+
+GameController o-- GameUI
+GameUI *-- Button
+
+@enduml
