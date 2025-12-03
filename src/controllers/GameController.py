@@ -14,6 +14,8 @@ class GameController:
 
         self.end_reason = ""
         
+        # Vị trí nước đi cuối (row, col) hoặc None
+        self.last_move = None
         # khởi tạo game lần đầu
         self.setup_new_game()
 
@@ -40,6 +42,7 @@ class GameController:
 
         self.game_over = False
         self.result_text = ""
+        self.last_move = None
 
     # ----------------- tiện ích -----------------
 
@@ -79,11 +82,13 @@ class GameController:
         if action == "pass":
             self.state.pass_move()
             self.check_game_over()
+            self.last_move = None # Xóa highlight khi pass
             return
 
         if action == "resign":
             self.game_over = True
             self.end_reason = "resign"
+            self.last_move = None
             winner = "White" if self.state.current_player == BLACK else "Black"
             self.result_text = f"{winner} wins by resignation !"
             return
@@ -109,6 +114,7 @@ class GameController:
         move = player.choose_move(self.state, (row, col))
         if move:
             self.apply_move_and_update(move)
+            # pygame.display.flip()
 
     # ----------------- áp dụng nước đi -----------------
 
@@ -136,7 +142,11 @@ class GameController:
             self.state.place_stone()
             self.state.switch_player()
             self.check_game_over()
-            
+            self.last_move = (r, c) # Lưu nước đi mới
+        
+        else:
+            # Nước đi không hợp lệ → không đổi last_move
+            pass
     def check_game_over(self):
         if self.state.is_game_over():
             self.game_over = True

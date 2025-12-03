@@ -15,15 +15,19 @@ def main():
     running = True
 
     while running:
-        clock.tick(FPS)
+        clock.tick(60)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 controller.handle_click(event.pos)
+                controller.draw(screen)
+                pygame.display.flip()
+                
+        if controller.is_current_ai():
+            controller.update()
 
-        controller.update()
         controller.draw(screen)
         pygame.display.flip()
 

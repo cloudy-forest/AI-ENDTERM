@@ -51,14 +51,20 @@ def minimax(board: Board, depth: int, maximizing: bool, ai_color: int,
 
 
 def choose_ai_move(board: Board, ai_color: int):
-    # Nếu bàn cờ đã gần đầy (>70 quân) và heuristic của trạng thái hiện tại rất tốt → pass
-    total_stones = sum(1 for i in range(9) for j in range(9) if board.grid[i][j] != 0)
-    if total_stones > 65:  # khoảng 80% bàn cờ
-        current_score = heuristic(board, ai_color)
-        # Nếu đang dẫn trước nhiều → pass luôn
-        if (ai_color == BLACK and current_score > 30) or \
-           (ai_color == WHITE and current_score > 20):
-            return None  # pass
+    # ====== THÊM ĐIỀU KIỆN PASS THÔNG MINH ======
+    total_empty = sum(1 for i in range(9) for j in range(9) if board.grid[i][j] == 0)
+    
+    # Nếu còn ít hơn 12 ô trống → 99% là endgame → nên pass nếu đang dẫn trước
+    if total_empty <= 12:
+        current_heuristic = heuristic(board, ai_color)
+        # Nếu AI đang dẫn trước ít nhất 8 điểm → pass luôn cho an toàn
+        if current_heuristic > 8:
+            return None  # PASS NGAY
 
+    # Nếu bàn cờ gần đầy (còn <= 8 ô trống) → pass vô điều kiện
+    if total_empty <= 8:
+        return None  # PASS LUÔN
+
+    # ====== BÌNH THƯỜNG: dùng Minimax ======
     _, move = minimax(board, MAX_DEPTH, True, ai_color)
     return move

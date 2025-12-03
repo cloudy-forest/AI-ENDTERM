@@ -157,7 +157,30 @@ class GameUI:
                 color = (0, 0, 0) if v == BLACK else (255, 255, 255)
                 pygame.draw.circle(screen, color, (cx, cy), radius)
                 pygame.draw.circle(screen, (0, 0, 0), (cx, cy), radius, 2)
+        
+        # Highlight nước đi cuối
+        if self.controller.last_move:
+            lr, lc = self.controller.last_move
+            if 0 <= lr < BOARD_SIZE and 0 <= lc < BOARD_SIZE:
+                cx = BOARD_MARGIN + lc * CELL_SIZE
+                cy = BOARD_MARGIN + lr * CELL_SIZE
+                
+                
+                # Lấy màu quân tại vị trí last move
+                stone_color = self.controller.board.grid[lr][lc]
+                if stone_color == BLACK:
+                    dot_color = (255, 255, 255) # Quân đen → chấm trắng
+                elif stone_color == WHITE:
+                    dot_color = (0, 0, 0) # Quân trắng → chấm đen
+                else:
+                    dot_color = (255, 255, 255)
 
+                # Vẽ chấm nhỏ nổi bật chính giữa quân cờ
+                pygame.draw.circle(screen, dot_color, (cx, cy), 11)        # Chấm to
+                pygame.draw.circle(screen, (255, 255, 255), (cx, cy), 11, 3)  # Viền trắng lấp lánh
+                pygame.draw.circle(screen, dot_color, (cx, cy), 5)         # Chấm nhỏ giữa (đậm hơn)
+        
+        
         # ghost stone
         if (not self.controller.game_over) and (not self.controller.is_current_ai()):
             coord = self.pixel_to_board(mouse_pos)
